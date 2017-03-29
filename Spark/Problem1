@@ -1,0 +1,36 @@
+val sqlContext = new org.apache.spark.sql.SQLContext(sc)
+
+val rddTransactions = sc.textFile("Transaction.csv")
+val schemaString = "TransID CustID TransTotal TransNumItems TransDesc"
+import org.apache.spark.sql._
+import org.apache.spark.sql.types._;
+val schema = StructType(schemaString.split(" ").map(fieldName => StructField(fieldName, StringType, true)))
+val rowRDD = rddTransactions.map(_.split(",")).map(p => Row(p(0).trim,p(1),p(2),p(3),p(4)))
+val dfTransactions = sqlContext.createDataFrame(rowRDD, schema)
+dfTransactions.registerTempTable("transactions")
+
+val T1 = sqlContext.sql("SELECT * FROM transactions WHERE TransTotal >= 200")
+T1.registerTempTable("t1")
+
+
+val T2 = sqlContext.sql("SELECT SUM(TransTotal) AS TransTotalSum, AVG(TransTotal) AS TransTotalAvg, MIN(TransTotal) AS TransTotalMin, MAX(TransTotal) AS TransTotalMax FROM t1 GROUP BY TransNumItems")
+
+T2.show()
+
+val T3 = sqlContext.sql("SELECT CustID, COUNT(*) AS TransCount FROM t1 GROUP BY CustID")
+
+val T4 = sqlContext.sql("SELECT * FROM transactions WHERE TransTotal >= 600")
+T4.registerTempTable("t4")
+val T5 = sqlContext.sql("SELECT CustID, COUNT(*) AS TransCount FROM t4 GROUP BY CustID")
+
+T3.registerTempTable("t3")
+T5.registerTempTable("t5")
+
+val T6 = sqlContext.sql("SELECT t3.CustID FROM t3, t5 WHERE t5.TransCount * 3 < t3.TransCount AND t3.CustID = t5.CustID")
+
+
+
+
+T6.map(t => "CustID: " + t(0)).collect().foreach(println)
+
+
